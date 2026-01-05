@@ -1,42 +1,52 @@
 
 from flask import Flask, render_template, request
-import yt_dlp
 
 app = Flask(__name__)
 
+
+STYLE_GUIDE = (
+    "abandoned theme-park animatronic scene, life-sized sculptural figure, "
+    "dusty decayed interior, heavy cobwebs, broken furniture, low moody lighting, "
+    "uncanny nostalgic tone, stillness, cinematic realism, highly detailed textures"
+)
+
+VARIATIONS = [
+    "sleeping pose at a worn table, soft rim light, shallow depth of field",
+    "chained on a cold concrete floor, harsh overhead spotlight, wide angle",
+    "slumped in a wooden chair, diffused window light, medium shot",
+    "collapsed beside a cracked prop set, foggy haze, low angle",
+    "upright but lifeless in a dusty corner, flashlight beam, close-up detail",
+]
+
+
+def build_prompts(subject):
+    prompts = []
+    for variation in VARIATIONS:
+        prompts.append(
+            f"{subject}, {variation}, {STYLE_GUIDE}"
+        )
+    return prompts
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    video_data = None
+    prompts = None
     error = None
+    subject = ""
 
     if request.method == 'POST':
-        fb_url = request.form['videoURL']
-        try:
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'skip_download': True,
-            }
+        subject = request.form.get('subject', '').strip()
+        if subject:
+            prompts = build_prompts(subject)
+        else:
+            error = "Please enter a character, movie, cartoon, or game."
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_dict = ydl.extract_info(fb_url, download=False)
-                video_data = {
-                    'title': info_dict.get('title'),
-                    'formats': [
-                        {
-                            'url': fmt.get('url'),
-                            'format': fmt.get('format_note') or fmt.get('ext'),
-                            'resolution': fmt.get('height') or 'audio'
-                        }
-                        for fmt in info_dict.get('formats', [])
-                        if fmt.get('url')
-                    ]
-                }
-
-        except Exception as e:
-            error = f"Failed to extract video: {str(e)}"
-
-    return render_template('index.html', video_data=video_data, error=error)
+    return render_template(
+        'index.html',
+        prompts=prompts,
+        error=error,
+        subject=subject
+    )
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
